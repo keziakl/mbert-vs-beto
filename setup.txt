@@ -1,0 +1,15 @@
+Note: Before running, you must download the BETO dependencies locally into the beto-vs-mbert folder using the following commands:
+
+!pip install transformers
+!wget https://users.dcc.uchile.cl/~jperez/beto/cased_2M/pytorch_weights.tar.gz 
+!wget https://users.dcc.uchile.cl/~jperez/beto/cased_2M/vocab.txt 
+!wget https://users.dcc.uchile.cl/~jperez/beto/cased_2M/config.json 
+!tar -xzvf pytorch_weights.tar.gz
+!mv config.json pytorch/.
+!mv vocab.txt pytorch/.
+
+Example prompt for conllu parsing:
+conllu2text.py hassubj UD_Spanish-GSD/es_gsd-ud-train.conllu datasets/hassubj.txt
+
+Example prompt for finding sentence scores:
+python sentence-scoring-bert.py datasets/hasprotrain.txt 10 280
