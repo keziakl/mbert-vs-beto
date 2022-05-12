@@ -69,32 +69,37 @@ def is_prodrop_sentence(sentence, sentence_type):
     for key in t:
         print(key, '->', t[key])
     '''
+    verb_indices = []
+    #find all verb indices in sentence
+    for token in sentence:
+        if token['upostag'] == 'VERB':
+            verb_indices.append(int(token['id'])-1)
     #find root (verb) indx (and get rid of phrases)
     for token in sentence:
         if token['deprel'] == 'root' and token['upostag'] != 'VERB':
-            return False
+            return False, verb_indices
         #get rid of "haber" sentences
         if token['deprel'] == 'root' and token['lemma'] == 'haber':
-            return False
+            return False,  verb_indices
         if token['deprel'] == 'root' and token['upostag'] == 'VERB':
             root_idx = token["id"]
     #get rid of special passive voice sentences
     for token in sentence:
         if token['deprel'] == 'iobj' and token["head"] == root_idx:
-            return False
+            return False, verb_indices
     #get rid of sentences with noun and pronoun subjects
     if sentence_type=='prodrop':
         for token in sentence:
             if (token['deprel'] == 'nsubj' or token['deprel'] == 'nsubj:pass') and token["head"] == root_idx:
-                return False
+                return False, verb_indices
     elif 'haspro':
         for token in sentence:
             if (token['deprel'] == 'nsubj' or token['deprel'] == 'nsubj:pass') and token["upostag"] == 'PRON' and token["head"] == root_idx:
-                return True
+                return True, verb_indices
     if sentence_type=='prodrop':   
-        return True
+        return True, verb_indices
     #the 'haspro' case
-    return False
+    return False, verb_indices
 
 '''
 Runs the parser for the specified sentence type.
@@ -106,24 +111,30 @@ def opener(sentence_type, file_name="UD_Spanish-GSD/es_gsd-ud-train.conllu", w2w
     data_file = open(file_name, "r", encoding="utf-8")
     count=0
     prodrop_sentences = []
+    sentence_verb_indices = []
     for sentence in parse_incr(data_file):
-        is_prodrop = is_prodrop_sentence(sentence, sentence_type)
+        is_prodrop, verb_indices = is_prodrop_sentence(sentence, sentence_type) 
         if is_prodrop and sentence_type=='haspro':
             count+=1
             prodrop_sentences.append(sentence.metadata['text'])
+            sentence_verb_indices.append(verb_indices)
         if is_prodrop and sentence_type=='prodrop':
             count+=1
             prodrop_sentences.append(sentence.metadata['text'])
+            sentence_verb_indices.append(verb_indices)
         if  sentence_type == 'hassubj' and not is_prodrop:
             count+=1
             prodrop_sentences.append(sentence.metadata['text'])
+            sentence_verb_indices.append(verb_indices)
     print("num sentences:", count)
     print(prodrop_sentences[16:21])
     with open(w2w, 'w') as f:
         count = 0
-        for sent in prodrop_sentences:
+        for sent, indices in zip(prodrop_sentences, sentence_verb_indices):
             count+=1
-            f.write(sent)
+            f.write(sent + "\n")
+            for x in indices:
+                f.write(str(x) + " ")
             if count != (len(prodrop_sentences)-1):
                 f.write("\n")
 

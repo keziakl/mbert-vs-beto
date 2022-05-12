@@ -7,6 +7,7 @@ import numpy as np
 import random
 from torch.nn import functional as F
 import sys
+import random
 
 def load_dataset(location='datasets/prodrop-train.txt'):
     print('Downloading dataset...')
@@ -15,6 +16,37 @@ def load_dataset(location='datasets/prodrop-train.txt'):
         for line in file:
             dataset.append(line)
     return dataset
+
+def get_bert_tokens(orig_tokens, tokenizer):
+    """
+    Given a list of sentences, return a list of those sentences in BERT tokens,
+    and a list mapping between the indices of each sentence, where
+    bert_tokens_map[i][j] tells us where in the list bert_tokens[i] to find the
+    start of the word in sentence_list[i][j]
+    The input orig_tokens should be a list of lists, where each element is a word.
+    """
+    bert_tokens = []
+    orig_to_bert_map = []
+    bert_to_orig_map = []
+    for i, sentence in enumerate(orig_tokens):
+        sentence_bert_tokens = []
+        sentence_map_otb = []
+        sentence_map_bto = []
+        sentence_bert_tokens.append("[CLS]")
+        for orig_idx, orig_token in enumerate(sentence):
+            sentence_map_otb.append(len(sentence_bert_tokens))
+            tokenized = tokenizer.tokenize(orig_token)
+            for bert_token in tokenized:
+                sentence_map_bto.append(orig_idx)
+            sentence_bert_tokens.extend(tokenizer.tokenize(orig_token))
+        sentence_map_otb.append(len(sentence_bert_tokens))
+        sentence_bert_tokens = sentence_bert_tokens[:511]
+        sentence_bert_tokens.append("[SEP]")
+        bert_tokens.append(sentence_bert_tokens)
+        orig_to_bert_map.append(sentence_map_otb)
+        bert_to_orig_map.append(sentence_map_bto)
+    bert_ids = [tokenizer.convert_tokens_to_ids(b) for b in bert_tokens]
+    return bert_tokens, bert_ids, orig_to_bert_map, bert_to_orig_map
 
 def get_score(sentence, tokenizer, model, k):
     #get logits for sentence
@@ -31,7 +63,8 @@ def get_score(sentence, tokenizer, model, k):
     score = 0
     if len(encodings)<=k:
         return score
-    for i in range(k):
+    indices = random.sample(range(0, len(encodings)-1), k)
+    for i in indices:
         score+=logits[i][encodings[i]]
     return score
 
@@ -43,7 +76,6 @@ def main():
     device = torch.device("cpu")
     print("loading dataset...")
     sentences = load_dataset(location=trainset_location)
-    minutes = n*23/60
     tokenizer_mbert = BertTokenizer.from_pretrained('bert-base-multilingual-uncased', do_lower_case=True)
     tokenizer_beto = BertTokenizer.from_pretrained('pytorch/', do_lower_case=True)
 
@@ -65,9 +97,6 @@ def main():
     for sentence in sentences:
         if count>n:
             break
-        if count%10==0:
-            minutes-=3.833
-            print("Doing iteration number ", count, " estimated remaining minutes: ", minutes)
         score_beto = get_score(sentence, tokenizer_beto, model_beto, k)
         average_score_beto+=score_beto
         score_mbert = get_score(sentence, tokenizer_mbert, model_mbert, k)
